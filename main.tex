@@ -1,6 +1,6 @@
 \documentclass{report}
 \usepackage{geometry}
-
+\usepackage{graphicx}
 % Define a custom environment with reduced margins
 \newenvironment{narrowmargins}{
     \newgeometry{top=1in, bottom=1in, left=0.5in, right=0.5in}
@@ -75,10 +75,18 @@ endmodule
 DSPs (Digital Signal Processors) are specialized hardware blocks in FPGA designs used for high-performance signal processing operations. They are commonly used in applications such as image and audio processing. The Verilog code snippet below shows an example of a simple multiplier using DSP blocks:
 
 \begin{verbatim}
-module multiplier (input wire [7:0] a, b, output wire [15:0] result);
+module multiplier (input wire [9:0] a, b, output wire [19:0] result);
     assign result = a * b;
 endmodule
 \end{verbatim}
+\begin{figure}[ht]
+    \includegraphics[width=0.4\linewidth]{images/dsp.png}
+    \centering
+    \caption{DSP Block Implemented}
+    \label{fig:dsp}
+\end{figure}
+
+*For Basys3 Vivado prefers to use dsp blocks 10 and more bits multiplication. For 9 bits and less, it uses LUTs and FFs, but adding \texttt{(* use\_dsp = "yes" *)} to the module can force Vivado to DSP for arithmetic operations.
 
 \subsection{IOBs}
 IOBs (Input/Output Blocks) are used to interface the FPGA design with external devices. They provide the necessary logic to drive and receive signals from the external world. The Verilog code snippet below shows an example of an IOB implementation for a simple GPIO (General Purpose Input/Output) interface:
