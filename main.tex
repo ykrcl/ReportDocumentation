@@ -1,11 +1,16 @@
 \documentclass{report}
+
+\usepackage{array}
+\usepackage{booktabs}  % For better table formatting
+\usepackage{amsmath}
 \usepackage{geometry}
 \usepackage{graphicx}
+
 % Define a custom environment with reduced margins
 \newenvironment{narrowmargins}{
     \newgeometry{top=1in, bottom=1in, left=0.5in, right=0.5in}
 }{\restoregeometry}
-
+\counterwithin{figure}{subsection}
 
 \title{Implementation Report Analysis}
 \author{Vivado}
@@ -33,6 +38,13 @@ module lut2 (input wire a, b, output wire y);
 endmodule
 \end{verbatim}
 
+\begin{figure}[ht]
+    \includegraphics[width=0.6\linewidth]{images/lut.png}
+    \centering
+    \caption{LUT Implemented}
+    \label{fig:lut}
+\end{figure}
+
 \subsection{FFs}
 FFs (Flip-Flops) are sequential elements used to store and propagate data in FPGA designs. They are commonly used to implement registers and memory elements. The Verilog code snippet below shows an example of a D flip-flop implementation:
 
@@ -46,30 +58,45 @@ module dff (input wire clk, reset, input wire d, output reg q);
 endmodule
 \end{verbatim}
 
+\begin{figure}[ht]
+    \includegraphics[width=0.6\linewidth]{images/ff.png}
+    \centering
+    \caption{FF Synthesised}
+    \label{fig:ff}
+\end{figure}
+
 \subsection{BRAMs}
 BRAMs (Block RAMs) are memory elements in FPGA designs. They provide large storage capacity and high-speed access. They can be coded into fpga, or The Verilog code snippet below shows an example of a simple dual-port RAM implementation:
-
 \begin{verbatim}
-module dual_port_ram (input wire clk, input wire [7:0] addr_a, addr_b,
-                      input wire [7:0] data_a, data_b,
-                      input wire we_a, we_b,
-                      output reg [7:0] q_a, q_b);
+module dual_port_ram (
+    input wire clk,
+    input wire [7:0] addr_a, addr_b,
+    input wire [7:0] data_a, data_b,
+    input wire we_a, we_b,
+    output reg [7:0] q_a, q_b
+);
     reg [7:0] mem [0:255];
-    
-    always @(posedge clk)
+    always @(posedge clk) begin
         if (we_a)
             mem[addr_a] <= data_a;
-    
-    always @(posedge clk)
+        q_a <= mem[addr_a]; // Synchronous read for port A
+    end
+    always @(posedge clk) begin
         if (we_b)
             mem[addr_b] <= data_b;
-    
-    always @(*)
-        q_a = mem[addr_a];
-        q_b = mem[addr_b];
+        q_b <= mem[addr_b]; // Synchronous read for port B
+    end
 endmodule
 \end{verbatim}
 
+* Vivado can pick BRAM, LUTRAM, or FFs to implement your design. If you want to force Vivado to use BRAM, you can use \texttt{(* ram\_style = "block" *)} in the module. If your design fits Bram conditions, Vivado will use BRAMs to implement your design. If you do not explicitly specify, Vivado will use LUTRAMs or FFs to implement your design depending on size required access speed etc.
+
+\begin{figure}[ht]
+    \includegraphics[width=0.6\linewidth]{images/bram.png}
+    \centering
+    \caption{BRam Implemented}
+    \label{fig:bram}
+\end{figure}
 
 \subsection{DSPs}
 DSPs (Digital Signal Processors) are specialized hardware blocks in FPGA designs used for high-performance signal processing operations. They are commonly used in applications such as image and audio processing. The Verilog code snippet below shows an example of a simple multiplier using DSP blocks:
@@ -80,7 +107,7 @@ module multiplier (input wire [9:0] a, b, output wire [19:0] result);
 endmodule
 \end{verbatim}
 \begin{figure}[ht]
-    \includegraphics[width=0.4\linewidth]{images/dsp.png}
+    \includegraphics[width=0.6\linewidth]{images/dsp.png}
     \centering
     \caption{DSP Block Implemented}
     \label{fig:dsp}
@@ -158,6 +185,15 @@ An example table from resource utilization report for the \texttt{top} module is
 \end{verbatim}
 
 General file names for this report are \texttt{Module\_Name\_utilization\_routed.rpt} or \texttt{Module\_Name\_utilization\_placed.rpt}.
+
+\subsection{TCL Commands}
+The most useful setting for utilization analysis when calling tcl option is hierarchical. This option gives a single table report, but with primitive types used by all submodules and theirs. This is useful to see which module is using the most of a specific resource. You can set this setting in the tcl command as follows:
+
+\begin{verbatim}
+    report_utilization -hierarchical
+\end{verbatim}
+
+*This command can help you to see which module is using the most of a specific resource. If you see a module is using a lot of a specific resource, you can optimize that module to reduce the resource usage.
 
 \chapter{Power Analysis}
 Power analysis is an important aspect of FPGA design as it helps in understanding the power consumption of the implemented design. By analyzing the power utilization, we can optimize the design to reduce power consumption and improve overall efficiency. Power analysis provides insights into the power consumption of different components in the design, such as LUTs, FFs, BRAMs, DSPs, and IOBs. It also helps in identifying any potential power-related issues that may need to be addressed. In this section, we will explore the power utilization of the \texttt{top} module and analyze the power consumption of various components in the design.
@@ -237,7 +273,13 @@ An example table from power utilization report for the \texttt{top} module is sh
 | MemController |     0.010 |
 +---------------+-----------+
 \end{verbatim}
-This table is not a great example,but if yours include your sub modules you can analyze the power consumption of different modules in the design and identify areas where power optimization is needed. For example, if a particular module is consuming a large amount of power, you can optimize that module to reduce power consumption.
+This table is not a great example,but if yours include your sub modules you can analyze the power consumption of different modules in the design and identify areas where power optimization is needed. For example, if a particular module is consuming a large amount of power, you can optimize that module to reduce power consumption. This because of the hierarchical depth setting. At next session you will see how to set this setting.
+\subsection{TCL Commands}
+The most useful setting for power analysis when calling tcl option is hierarchical\_depth. When implem run it ussually set to 1 by default. However, if you set it to 0, you can see the power consumption of the submodules and their submodules until the least piece. This is useful to see which module is consuming the most power, or you can set the depth you desire You can set this setting in the tcl command as follows:
+
+\begin{verbatim}
+    report_power -hierarchical_depth 0
+\end{verbatim}
 
 \chapter{Methodology Warnings}
 The methodology warnings section of the report provides information about any potential issues or warnings that may need to be addressed. This section includes information about the timing constraints, clock constraints, and other design constraints that may impact the performance of the design. The methodology warnings section helps in identifying any potential issues that may need to be addressed to improve the performance of the design.
@@ -575,6 +617,9 @@ There are calculation logic between these two registers. Now lets look at times:
     \item Clock signal reached the destination register at 14.857 (Destination Clock Delay: 14.857ns - 10ns = 4.857ns), starting setup time.
     \item The setup is ready at 14.571ns, with calculation of clock pessimism and uncertainty. (Slack: 14.571ns - 10.344ns = 4.227ns)
 \end{itemize}
+
+\textbf{To sum up, time required is when the second rise of the clock signal is reaches the destination register. Time arrival is the exact time data gets to D pin. Data path delay is Q to D.}
+
 Also as you can see that the clock reacjed at different times to the two registers. This a clock skew example.*
 
 When it is a hold slack timing path, the time that data reaches the destination register is calculated. Then the hold time is calculated by the time that data is stable after the clock edge.
@@ -591,6 +636,653 @@ There are several solutions available for negative setup slack:
 
 \textit{*In timing analysis, clock pessimism is initially introduced to ensure safety. However, when calculating timing slack (e.g., setup slack), the tools may apply Clock Pessimism Removal (CPR) to reduce or eliminate some of this conservative estimation. CPR adjusts the clock arrival times so that the analysis is more realistic. Therefore, the slack value is calculated by subtracting the arrival time from the required time. Don't get confused.}
 
+\subsection{TCL Commands}
+The most useful settings for timing analysis when calling tcl option are:
+\begin{itemize} 
+    \item -from [pin]: The starting point of the path to be analyzed.
+    \item -to [pin]: The ending point of the path to be analyzed.
+    \item -setup: The setup time analysis for the paths.
+    \item -hold: The hold time analysis for the paths.
+    \item -nworst [\#]: The number of worst paths per clock domain to be analyzed.
+    \item -through [names]: The paths that are crossing a specific nets/pins/cells.
+\end{itemize}
+
+You can combine these options, adding them to options place \texttt{report\_timing [options]} to get the report you desire. 
+To find pin/path/cell names, you can use \texttt{get\_pins}, \texttt{get\_paths}, \texttt{get\_cells} commands, with search option \texttt{*keyword*}. Example: \texttt{get\_pins *clk*}.
+
+*It is useful when the original report only gives worse 10 slacks and you need to know the exact path slack for improvement. For example you can find and get timings of all paths to a single register with these commands.
+
+\chapter{Examining Reports of Common Designs \& Questions}
+In this section, we will examine the reports of some common designs to understand the information provided in the reports and we will see how LUT/DSP arithmetic, shifting registers effect power, timing, and resource utilization.
+
+% \section{Affect of Simple Addition on Power, Timing, and Resource Utilization}
+% In this design, we will try to find effect of summation on data path delay using luts and dsp.
+
+
+% \subsection{First Case}
+% In this case, we will get another input and set the register as their sum for each clock cycle. 
+
+% \begin{verbatim}
+%     module SumRegisterTest(
+%         input wire clk,
+%         input wire reset,
+%         input wire [7:0] data_in,
+%         input wire [7:0] data_in_2,
+%         output reg [8:0] data_out
+%     );
+%         reg [7:0] prev_1; // Data Store
+%         reg [7:0] prev_2; // Data Store
+    
+%         always @(posedge clk or posedge reset) begin
+%             if (reset) begin
+%                 data_out <= 9'b00000000;  // Initialize the register
+%                 prev_1 <= 8'b00000000;  // Initialize the register
+%                 prev_2 <= 8'b00000000;  // Initialize the register
+%             end else begin
+%                 prev_1 <= data_in;
+%                 prev_2 <= data_in_2;
+%                 data_out <= prev_1 + prev_2;
+%             end
+%         end
+    
+    
+%     endmodule
+% \end{verbatim}
+% \subsection{second Case}
+% In this case, we will use same module from previous case, but Vivado will be forced to use DSP for summation using \texttt{(* use\_dsp = "yes" *)}.
+
+% \subsection{Properties to be checked}
+% \begin{itemize}
+%     \item Resource Utilization: The resource utilization of the design will be analyzed to understand the resource consumption of the design.
+%     \item Power Utilization: The power utilization of the design will be analyzed to understand the power consumption of Summation for DSP and LUTs.
+%     \item Timing Analysis: The timing analysis of the design will be performed to understand the timing performance of Summation.
+% \end{itemize}
+
+% \subsection{Resource Utilization}
+% The resource utilization report for the SumRegisterTest module is shown below:
+% \linebreak
+% \linebreak
+% for the first case:
+% \begin{verbatim}
+% +----------+------+---------------------+
+% | Ref Name | Used | Functional Category |
+% +----------+------+---------------------+
+% | FDCE     |   25 |        Flop & Latch |
+% | IBUF     |   18 |                  IO |
+% | OBUF     |    9 |                  IO |
+% | LUT2     |    8 |                 LUT |
+% | CARRY4   |    3 |          CarryLogic |
+% | BUFG     |    1 |               Clock |
+% +----------+------+---------------------+
+% \end{verbatim}
+
+% for the second case:
+% \begin{verbatim}
+% +----------+------+---------------------+
+% | Ref Name | Used | Functional Category |
+% +----------+------+---------------------+
+% | IBUF     |   18 |                  IO |
+% | FDCE     |   17 |        Flop & Latch |
+% | OBUF     |    9 |                  IO |
+% | LUT2     |    9 |                 LUT |
+% | DSP48E1  |    1 |    Block Arithmetic |
+% | BUFG     |    1 |               Clock |
+% +----------+------+---------------------+
+% \end{verbatim}
+
+% \subsection{Power Utilization}
+% Power utilization report for the SumRegisterTest module is shown below:
+% \linebreak
+% \linebreak
+% for the first case:
+% \begin{verbatim}
+%     +--------------------------+--------------+
+% | Total On-Chip Power (W)  | 0.077        |
+% | Design Power Budget (W)  | Unspecified* |
+% | Power Budget Margin (W)  | NA           |
+% | Dynamic (W)              | 0.006        |
+% | Device Static (W)        | 0.070        |
+% | Effective TJA (C/W)      | 5.0          |
+% | Max Ambient (C)          | 84.6         |
+% | Junction Temperature (C) | 25.4         |
+% | Confidence Level         | Low          |
+% | Setting File             | ---          |
+% | Simulation Activity File | ---          |
+% | Design Nets Matched      | NA           |
+% +--------------------------+--------------+
+% \end{verbatim}
+
+% for the second case:
+% \begin{verbatim}
+% +--------------------------+--------------+
+% | Total On-Chip Power (W)  | 0.077        |
+% | Design Power Budget (W)  | Unspecified* |
+% | Power Budget Margin (W)  | NA           |
+% | Dynamic (W)              | 0.006        |
+% | Device Static (W)        | 0.070        |
+% | Effective TJA (C/W)      | 5.0          |
+% | Max Ambient (C)          | 84.6         |
+% | Junction Temperature (C) | 25.4         |
+% | Confidence Level         | Low          |
+% | Setting File             | ---          |
+% | Simulation Activity File | ---          |
+% | Design Nets Matched      | NA           |
+% +--------------------------+--------------+
+% \end{verbatim}
+% \subsection{Timing Analysis}
+% Timing analysis report for the SumRegisterTest module is shown below:
+% \linebreak
+% \linebreak
+% for the first case:
+% \begin{itemize}
+%     \item WNS (Worst Negative Slack): 7.680ns  
+%     \item The slowest data path delay between input the registers and the output register is 2.322ns
+% \end{itemize}
+
+% for the second case:
+
+% \begin{itemize}
+%     \item WNS (Worst Negative Slack): 6.891ns  
+%     \item The slowest data path delay between the input registers and the output register is 1.202ns + 
+% \end{itemize}
+
+
+\section{Multiplication}
+In this design, we will try to find best way to multiply two 8,16,32-bit numbers. We will compare LUTs, DSPs, and using Multiply IP and '*' operator.
+
+\subsection{First Case}
+In this case, we will use the '*' operator and Multilier IP (No Stages) to multiply two numbers, using only LUTs.
+
+The modules used are below:
+\begin{verbatim}
+    (* USE_DSP="no", keep_hierarchy = "yes" *) module Multiplier #(parameter A_WIDTH = 8,
+     B_WIDTH = 8)(input wire clk,
+    input wire [A_WIDTH-1:0] a,
+    input wire [B_WIDTH-1:0] b,
+    output reg [A_WIDTH+B_WIDTH-1:0] product
+);
+
+    always @(clk) begin
+        product <= a * b;
+    end
+
+endmodule    
+
+
+module Main(
+    input wire clk, input wire [31:0] raw_a_32, input wire [31:0] raw_b_32, 
+    input wire rst, output reg [5:0] fake_out
+    );
+
+    wire AHundredMHz_clk;
+    wire TwoHundredMHz_clk;
+    wire locked;
+
+    reg [31:0] a_32;
+    reg [31:0] b_32;
+    reg [15:0] product_16;
+    reg [31:0] product_32;
+    reg [63:0] product_64;
+    reg [15:0] product_ip_16;
+    reg [31:0] product_ip_32;
+    reg [63:0] product_ip_64;
+
+    clk_wiz_0 clk_prov(.clk_out1(AHundredMHz_clk), .clk_out2(TwoHundredMHz_clk), .reset(rst), .locked(locked), .clk_in1(clk));
+
+    wire [15:0] product_w_16;
+    wire [31:0] product_w_32;
+    wire [63:0] product_w_64;    
+    wire [15:0] product_ip_w_16;
+    wire [31:0] product_ip_w_32;
+    wire [63:0] product_ip_w_64;    
+
+    Multiplier #(.A_WIDTH(8), .B_WIDTH(8)) mult_8(.clk(AHundredMHz_clk), .a(a_32[7:0]), .b(b_32[7:0]), .product(product_w_16));
+    Multiplier #(.A_WIDTH(16), .B_WIDTH(16)) mult_16(.clk(AHundredMHz_clk), .a(a_32[15:0]), .b(b_32[15:0]), .product(product_w_32));
+    Multiplier #(.A_WIDTH(32), .B_WIDTH(32)) mult_32(.clk(AHundredMHz_clk), .a(a_32[31:0]), .b(b_32[31:0]), .product(product_w_64));
+
+    mult_gen_0 mult_gen_8(a_32[7:0], b_32[7:0], product_ip_w_16);
+    mult_gen_1 mult_gen_16(a_32[15:0], b_32[15:0], product_ip_w_32);
+    mult_gen_2 mult_gen_32(a_32[31:0], b_32[31:0], product_ip_w_64);
+
+    always @(posedge AHundredMHz_clk or posedge rst) begin
+        if (rst) begin
+            product_16 <= 16'b0;
+            product_32 <= 32'b0;
+            product_64 <= 64'b0;
+            product_ip_16 <= 16'b0;
+            product_ip_32 <= 32'b0;
+            product_ip_64 <= 64'b0;
+        end
+        else begin
+            product_16 <= product_w_16;
+            product_32 <= product_w_32;
+            product_64 <= product_w_64;
+            product_ip_16 <= product_ip_w_16;
+            product_ip_32 <= product_ip_w_32;
+            product_ip_64 <= product_ip_w_64;
+            fake_out[0] <= product_16[15];
+            fake_out[1] <= product_32[31];
+            fake_out[2] <= product_64[63];
+            fake_out[3] <= product_ip_16[15];
+            fake_out[4] <= product_ip_32[31];
+            fake_out[5] <= product_ip_64[63];
+            a_32 <= raw_a_32;
+            b_32 <= raw_b_32;
+        end
+    end
+endmodule
+\end{verbatim}
+
+The results of the first case are shown below:    
+\textbf{Utilization:}
+\begin{figure}[ht]
+    \includegraphics[width=1\linewidth]{images/LUT_MUL_Util.png}
+    \centering
+    \caption{Only LUT Multilier Utilization Hierarchical}
+    \label{fig:only_lut_util}
+\end{figure}
+
+The submodules that has 'gen' in their names are IP multipliers build with only LUTs. The results indicate that the IP has better resource utilization than the '*' operator.
+
+\textbf{Power:}
+\begin{figure}[ht]
+    \includegraphics[width=1\linewidth]{images/LUT_MUL_POWER.png}
+    \centering
+    \caption{Only LUT Multilier Power Hierarchical}
+    \label{fig:only_lut_power}
+\end{figure}
+
+The results indicates that the IP has better power utilization than the '*' operator.
+
+\textbf{Timing:}
+Critical path timing (Violating) of the design as follows:
+
+\begin{verbatim}
+Slack (VIOLATED) :        -0.973ns  (required time - arrival time)
+  Source:                 a_32_reg[8]/C
+                            (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            product_ip_64_reg[63]/D
+                            (rising edge-triggered cell FDCE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             clk_out1_clk_wiz_0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (clk_out1_clk_wiz_0 rise@10.000ns - clk_out1_clk_wiz_0 rise@0.000ns)
+  Data Path Delay:        10.936ns  (logic 6.760ns (61.812%)  route 4.176ns (38.188%))
+  Logic Levels:           23  (CARRY4=18 LUT2=4 LUT4=1)
+  Clock Path Skew:        -0.031ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    -2.062ns = ( 7.938 - 10.000 ) 
+    Source Clock Delay      (SCD):    -2.457ns
+    Clock Pessimism Removal (CPR):    -0.425ns
+  Clock Uncertainty:      0.068ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.116ns
+    Phase Error              (PE):    0.000ns
+
+
+Slack (VIOLATED) :        -0.776ns  (required time - arrival time)
+  Source:                 b_32_reg[4]/C
+                            (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            product_64_reg[63]/D
+                            (rising edge-triggered cell FDCE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             clk_out1_clk_wiz_0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (clk_out1_clk_wiz_0 rise@10.000ns - clk_out1_clk_wiz_0 rise@0.000ns)
+  Data Path Delay:        10.851ns  (logic 5.250ns (48.381%)  route 5.601ns (51.619%))
+  Logic Levels:           21  (CARRY4=15 LUT3=2 LUT4=1 LUT5=1 LUT6=2)
+  Clock Path Skew:        0.034ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    -2.002ns = ( 7.998 - 10.000 ) 
+    Source Clock Delay      (SCD):    -2.462ns
+    Clock Pessimism Removal (CPR):    -0.425ns
+  Clock Uncertainty:      0.068ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.116ns
+    Phase Error              (PE):    0.000ns
+
+
+Slack (VIOLATED) :        -0.131ns  (required time - arrival time)
+  Source:                 a_32_reg[12]/C
+                            (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            product_32_reg[31]/D
+                            (rising edge-triggered cell FDCE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             clk_out1_clk_wiz_0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (clk_out1_clk_wiz_0 rise@10.000ns - clk_out1_clk_wiz_0 rise@0.000ns)
+  Data Path Delay:        10.134ns  (logic 3.673ns (36.244%)  route 6.461ns (63.756%))
+  Logic Levels:           12  (CARRY4=7 LUT3=1 LUT4=1 LUT5=1 LUT6=2)
+  Clock Path Skew:        -0.038ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    -2.067ns = ( 7.933 - 10.000 ) 
+    Source Clock Delay      (SCD):    -2.455ns
+    Clock Pessimism Removal (CPR):    -0.425ns
+  Clock Uncertainty:      0.068ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.116ns
+    Phase Error              (PE):    0.000ns
+
+Slack (VIOLATED) :        -0.104ns  (required time - arrival time)
+  Source:                 a_32_reg[0]/C
+                            (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            product_ip_32_reg[31]/D
+                            (rising edge-triggered cell FDCE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             clk_out1_clk_wiz_0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (clk_out1_clk_wiz_0 rise@10.000ns - clk_out1_clk_wiz_0 rise@0.000ns)
+  Data Path Delay:        10.107ns  (logic 5.046ns (49.927%)  route 5.061ns (50.073%))
+  Logic Levels:           14  (CARRY4=10 LUT2=4)
+  Clock Path Skew:        -0.038ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    -2.070ns = ( 7.930 - 10.000 ) 
+    Source Clock Delay      (SCD):    -2.458ns
+    Clock Pessimism Removal (CPR):    -0.425ns
+  Clock Uncertainty:      0.068ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.116ns
+    Phase Error              (PE):    0.000ns
+
+\end{verbatim}
+
+The results indicate that 32-bit multiplication has timing violation for both. The '*' operator seems to more close to 0 slack than the IP multiplier for 32-Bit.
+However, for the 16-bit violation, the IP multiplier has better slack than the '*' operator. When inspected in detail all the reports, the IP multiplier has larger logic time delay than '*'. However, '*''s route delay is larger than IP multiplier. For larger bits the IP multiplier has worse slack than '*', but it has better slack for smaller bits.
+
+\subsection{Second Case}
+In this case, we will use the '*' operator and Multilier IP (No Stages) to multiply two numbers, using DSPs.
+
+The modules used are below:
+\begin{verbatim}
+(* USE_DSP="yes", keep_hierarchy = "yes" *) module Multiplier_Dsp #(parameter A_WIDTH = 8,
+     B_WIDTH = 8)(input wire clk,
+    input wire [A_WIDTH-1:0] a,
+    input wire [B_WIDTH-1:0] b,
+    output reg [A_WIDTH+B_WIDTH-1:0] product
+);
+
+    always @(clk) begin
+        product <= a * b;
+    end
+endmodule
+module Main_Dsp(
+input wire clk, input wire [31:0] raw_a_32, input wire [31:0] raw_b_32, input wire rst, output reg [5:0] fake_out
+    );
+
+    wire AHundredMHz_clk;
+    wire TwoHundredMHz_clk;
+    wire locked;
+
+    reg [31:0] a_32;
+    reg [31:0] b_32;
+    reg [15:0] product_16;
+    reg [31:0] product_32;
+    reg [63:0] product_64;
+    reg [15:0] product_ip_16;
+    reg [31:0] product_ip_32;
+    reg [63:0] product_ip_64;
+
+    clk_wiz_0 clk_prov_1(.clk_out1(AHundredMHz_clk), .clk_out2(TwoHundredMHz_clk), .reset(rst), .locked(locked), .clk_in1(clk));
+
+    wire [15:0] product_w_16;
+    wire [31:0] product_w_32;
+    wire [63:0] product_w_64;    
+    wire [15:0] product_ip_w_16;
+    wire [31:0] product_ip_w_32;
+    wire [63:0] product_ip_w_64;    
+
+    Multiplier_Dsp #(.A_WIDTH(8), .B_WIDTH(8)) mult_dsp_8(.clk(AHundredMHz_clk), .a(a_32[7:0]), .b(b_32[7:0]), .product(product_w_16));
+    Multiplier_Dsp #(.A_WIDTH(16), .B_WIDTH(16)) mult_dsp_16(.clk(AHundredMHz_clk), .a(a_32[15:0]), .b(b_32[15:0]), .product(product_w_32));
+    Multiplier_Dsp #(.A_WIDTH(32), .B_WIDTH(32)) mult_dsp_32(.clk(AHundredMHz_clk), .a(a_32[31:0]), .b(b_32[31:0]), .product(product_w_64));
+
+    mult_gen_3 mult_gen_dsp_8(a_32[7:0], b_32[7:0], product_ip_w_16);
+    mult_gen_4 mult_gen_dsp_16(a_32[15:0], b_32[15:0], product_ip_w_32);
+    mult_gen_5 mult_gen_dsp_32(a_32[31:0], b_32[31:0], product_ip_w_64);
+
+    always @(posedge AHundredMHz_clk or posedge rst) begin
+        if (rst) begin
+            product_16 <= 16'b0;
+            product_32 <= 32'b0;
+            product_64 <= 64'b0;
+            product_ip_16 <= 16'b0;
+            product_ip_32 <= 32'b0;
+            product_ip_64 <= 64'b0;
+        end
+        else begin
+            product_16 <= product_w_16;
+            product_32 <= product_w_32;
+            product_64 <= product_w_64;
+            product_ip_16 <= product_ip_w_16;
+            product_ip_32 <= product_ip_w_32;
+            product_ip_64 <= product_ip_w_64;
+            fake_out[0] <= product_16[15];
+            fake_out[1] <= product_32[31];
+            fake_out[2] <= product_64[63];
+            fake_out[3] <= product_ip_16[15];
+            fake_out[4] <= product_ip_32[31];
+            fake_out[5] <= product_ip_64[63];
+            a_32 <= raw_a_32;
+            b_32 <= raw_b_32;
+        end
+    end
+endmodule
+\end{verbatim}
+
+The results of the second case are shown below:
+\textbf{Utilization:}
+\begin{figure}[ht]
+    \includegraphics[width=1\linewidth]{images/MUL_DSP_Util.png}
+    \centering
+    \caption{DSP Multilier Utilization Hierarchical}
+    \label{fig:dsp_util}
+\end{figure}
+
+The submodules that has 'gen' in their names are IP multipliers built with only DSPs. The results indicate that the IP has better resource utilization than the '*' operator for only 32-bit multiplication. Otherwise same.
+
+\break
+\textbf{Power:}
+
+\begin{figure}[ht]
+    \includegraphics[width=1\linewidth]{images/MUL_DSP_POWER.png}
+    \centering
+    \caption{DSP Multilier Power Hierarchical}
+    \label{fig:dsp_power}
+\end{figure}
+For 32-bit, IP multiplier has better power utilization than the '*' operator. Otherwise, they are similar.
+
+\textbf{Timing:}
+Critical path timing (Violating) of the design as follows:
+
+\begin{verbatim}
+Slack (VIOLATED) :        -0.644ns  (required time - arrival time)
+  Source:                 a_32_reg[10]_replica/C
+                            (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            product_ip_64_reg[63]/D
+                            (rising edge-triggered cell FDCE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             clk_out1_clk_wiz_0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (clk_out1_clk_wiz_0 rise@10.000ns - clk_out1_clk_wiz_0 rise@0.000ns)
+  Data Path Delay:        10.540ns  (logic 9.436ns (89.525%)  route 1.104ns (10.475%))
+  Logic Levels:           4  (DSP48E1=4)
+  Clock Path Skew:        -0.020ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    -2.061ns = ( 7.939 - 10.000 ) 
+    Source Clock Delay      (SCD):    -2.454ns
+    Clock Pessimism Removal (CPR):    -0.412ns
+  Clock Uncertainty:      0.068ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.116ns
+    Phase Error              (PE):    0.000ns
+
+    
+Slack (VIOLATED) :        -0.068ns  (required time - arrival time)
+  Source:                 b_32_reg[6]_replica/C
+                            (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            product_64_reg[63]/D
+                            (rising edge-triggered cell FDCE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             clk_out1_clk_wiz_0
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            10.000ns  (clk_out1_clk_wiz_0 rise@10.000ns - clk_out1_clk_wiz_0 rise@0.000ns)
+  Data Path Delay:        10.043ns  (logic 7.611ns (75.785%)  route 2.432ns (24.215%))
+  Logic Levels:           10  (CARRY4=7 DSP48E1=2 LUT2=1)
+  Clock Path Skew:        -0.019ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    -2.061ns = ( 7.939 - 10.000 ) 
+    Source Clock Delay      (SCD):    -2.455ns
+    Clock Pessimism Removal (CPR):    -0.412ns
+  Clock Uncertainty:      0.068ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.116ns
+    Phase Error              (PE):    0.000ns
+\end{verbatim}
+
+The results indicate that 32-bit multiplication has timing violation for both. The '*' operator seems to more close to 0 slack than the IP multiplier for 32-Bit.
+When other met max delay paths are inspected, the IP multiplier data path delay is larger than '*' in general.
+For a no stage multiplication using DSP a '*' operator might be the choice for better slack given a bit more area is used.
+
+Given the results using DSP blocks are much more efficient than using LUTs for multiplication for larger bit arrays.
+If the design intends to use no pipeline, the '*' operator might be the choice for better slack and usage simplicity as the results are close with no stage IP. 
+
+\section{Slack / Clock / Pipeline Relationship Investigation}
+In this part we will try to answer following questions: 
+\begin{enumerate}
+    \item Can we assume that if we increase clock period by X seconds, slack will increase by X seconds?
+    \item How does Multiplier IP stages effect slack? (Even delay paths between stages or not)
+    \item Using the information from first two questions, can we fine tune the clock period given to IP multiplier to have a single clock cycle result in the top module?
+    \item Why does the IP setup suggests a stage level? Is it related to the maximum clock speed of the device?
+\end{enumerate}
+
+\subsection{First Question}
+In this part, we will try to understand the relationship between slack and clock period. We will try to increase the clock period by X seconds and see if the slack increases by X seconds.
+We will use the same module from the dsp part of the multiplication part using only IP Multiliers.
+
+The clock period was set to 10ns and worst slack was around -0.644ns. New clock period will be:
+\[
+\text{Closest integer} = \left\lfloor \frac{1}{10 \, \text{ns} + 0.644} + \frac{1}{2} \right\rfloor = 93896714 \approx 93.75 \text{MHZ}
+\]
+The hypothesis is that if we set the clock period to 10.667ns, the slack will be positive close to 0. The results are shown below:
+\begin{verbatim}
+    -------------------------------------------------------------------
+    required time                          8.073    
+    arrival time                          -8.073    
+-------------------------------------------------------------------
+    slack                                 -0.001
+\end{verbatim}
+It failed again. It is observed that the slack is close to 0. The hypothesis is close to be correct. The slack is increased by 0.649ns when the clock period is increased by 0.667ns. Given the phase error and jitter of the clock it is more safe to increase the clock period more than required.
+
+Trying again with 93.333MHZ, 10.71ns:
+
+\begin{verbatim}
+    -------------------------------------------------------------------
+    required time                          8.117    
+    arrival time                          -8.076    
+-------------------------------------------------------------------
+    slack                                  0.041    
+\end{verbatim}
+Slack is tested again with other clocks as data path delay is changing with the clock When the results are combined (Note that the non ip parts are removed therefore the the slack at 100MHZ is different than the previous results):
+
+\text{}
+
+\begin{table}[!h]
+    \centering
+    \caption{Timing Analysis at Different Clock Frequencies}
+    \begin{tabular}{|c|c|c|c|}
+    \hline
+    \textbf{Path Delay} & \textbf{Clk frq (MHz)} & \textbf{Period (ns)} & \textbf{Slack} \\
+    \hline
+    11.093 & 50       & 20.000   & 8.657     \\
+    10.538 & 93.333   & 10.714   & 0.041     \\
+    10.535 & 93.750   & 10.535   & -0.001    \\
+    10.373 & 100      & 10.000   & -0.495    \\
+    10.361 & 200      & 5.000    & -5.488    \\
+    \hline
+    \end{tabular}
+    \end{table}
+
+By looking and plotting the data we can see that the data path delay and thus the slack values are not linearly related to the clock period.
+As frequency increases, the path delay change descreases.
+By doing this analysis we can conclude that there is no linear relationship between slack and clock period, but there is a relation this close to linear at higher clock speeds.
+
+\subsection{Second Question}
+The second question requires us to find how does Multiplier IP pipelines multiple stages.
+To find a relationship, we will use critical path and how it is reduced after each stage. Same module will be used with different stages of IP multipliers.
+
+During this test we will use 10ns clock period. It has initially Worst Slack as -0.495ns.
+The two paths that are critical are:
+\begin{itemize}
+    \item any a or b register to IP (it can have a weird name like mult\_gen\_dsp\_32/U0/i\_mult/gDSP.gDSP\_only.iDSP/ use\_prim.appDSP[1].bppDSP[1].use\_dsp.use\_dsp48e1.iDSP48E1/PCIN[0]) which refers to a flip flop inside the DSP block)
+    \item any path from IP to output register 
+    \item any path from IP register to IP register
+\end{itemize}
+
+\begin{enumerate}
+    \item \textbf{Stage 0:} Slowest path is from a\_32[i] register to the product register through the IP. \textbf{The max data path delay is 10.373 ns.}
+    \item \textbf{Stage 1:} Slowest path is from a\_32[i] register to a dsp register register inside the IP. \textbf{Data path delay is 8.503.} Searching a path from an IP to output register, \textbf{the longest path is 1.119ns} and it is in the 32-bit multiplier. It suggests that the IP doing most of the job in the first cycle.
+    \item \textbf{Stage 2:} Slowest path is from a dsp register inside the IP to a dsp register register inside the IP (mult\_gen\_dsp\_32/U0/i\_mult/gDSP.gDSP\_only.iDSP/use\_prim.appDSP[0].bppDSP[0].use\_dsp.use\_dsp48e1.iDSP48E1/CLK to mult\_gen\_dsp\_32/U0/i\_mult/gDSP.gDSP\_only.iDSP/use\_prim.appDSP[1].bppDSP[1]). \textbf{Data path delay is 6.633.}. It suggests that most of the job is done in the intermediate cycle. In the first cycle the maximum data path is to the 32-bit multiplier IP and \textbf{Its data path delay is 2.815.} The maximum data path delay from the IPs to output register is 1.180ns and in the 32-bit multiplier.
+    \item \textbf{Stage 3:} From timing report couldn't detect pipelining paths due to hidden information, but intermediate maximum data path delay is \textbf{4.208ns}. Input to the IP paths has maximum delay \textbf{2.815 ns}. The maximum data path delay from the IPs to output register is \textbf{1.119ns.} These are the maximum delay paths and they are inside the 32-bit multiplier IP.
+\end{enumerate}
+
+From this infromation we can come up with a table:
+
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{c|c|c|c}
+    \toprule
+    & \multicolumn{3}{c}{Critical Path Delays (ns)} \\
+    \midrule
+    \# of Stages  & Input & Intermediate Step/s & Output \\
+    \midrule
+    0 & \multicolumn{3}{c}{Combinational* \hspace{30pt} 10.373} \\
+    \midrule
+    1 & 8.503 & - & 1.119 \\
+    \midrule
+    2 & 2.815 & 6.633 & 1.180 \\
+    \midrule
+    3 & 2.815 & 4.208 & 1.119 \\
+    \bottomrule
+    \end{tabular}
+    \caption{Critical Path Delays}
+    \label{tab:critical_path_delays}
+    \end{table}
+Input refers to the delay from the input register to the IP, intermediate step/s refers to the delay inside the IPs, and output refers to the delay from the IP to the output register.
+A few things can be inferred from the table:
+\begin{itemize}
+    \item The maximum delay path is reduced after each stage by around 2ns.
+    \item Stages are not divided equally. An intermediate step is doing most of the job, or first one if it is a stage 0 and stage 1 IP.
+    \item After 2 stages data path that gets input and gives output stays similar as job is done in the intermediate steps. 
+\end{itemize}
+
+To be sure that the data path delay is reduced by 2ns after each stage, the reports for 4 stages and check the data path delays is checked. The maximum delay path in the ip and the whole system reduced to 2.428 as expected. At 5th stage, intermediate step path delays are below input and output path delays and \textbf{almost all of their delays are net delay}, so we can't say at every stage 2ns reduced.
+
+\subsection{Third Question}
+The investigation indicates that we can't assume that the stages are equally divided and we cannot multiply clock by 2 as we increase the pipeline stages by one.
+\subsection{Fourth Question}
+Another mistery that why and how the optimum stage level of multiplier ip suggested by Vivado. The hypothesis is that it is related to the minimum clock period that the device, Basys3, can handle. Basys3 can handle maximum \textbf{450MHZ} clock frequency as documented, which corresponds to 2.222ns. The IP suggests a stage level to be 6 for 32-bit unsigned multiplier. We will check:
+\begin{itemize}
+    \item The maximum delay path and the slack in the IP at stage level suggested.
+    \item If it is below 2.222ns and we have slack around 8ns, we will check slack given the clock period is 2.222ns because given clock related time delays data path delay doesn't directly mean time required.
+    \item To finalize the hypothesis, we will check again at stage level 5 if it is failing timing.
+\end{itemize}
+
+\textbf{Checking at Stage Level 6:}
+The result showted that the worst data path delay in the whole system is 2.585ns. Minimum slack is 6.852. However, higher clock speeds can make the dsp even faster as we already found. Therefore it is worth to check the slack at 2.222ns clock period.
+
+\textbf{Checking at 2.222ns Clock Period:}
+The results indicate that the design got faster. The worst path delay is 1.802. However, due to clock effects it is slightly negative, -0.045ns. Which means that we can try to work with 400MHZ clock.
+
+\textbf{Checking at 2.5ns Clock Period:}
+After decreasing frequency to 400MHZ, worst slack is:
+\begin{verbatim}
+        Slack (MET) :             0.014ns  (required time - arrival time)
+        -------------------------------------------------------------------
+                         required time                         -0.667    
+                         arrival time                           0.681    
+  -------------------------------------------------------------------
+                         slack                                  0.014    
+\end{verbatim}
+
+This test indicted that the optimum suggested stage level is related to the maximum clock speed of the device. The IP suggests a stage level that can handle the maximum clock speed of the device. Due to clock uncertainty it is same to use a smaller clock period than the maximum clock speed of the device as slack report showed. The report showed clock uncertainty and adds it to time domain to find the slack:
+\begin{verbatim}
+    Clock Uncertainty:      0.057ns  ((TSJ^2 + DJ^2)^1/2) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Discrete Jitter          (DJ):    0.090ns
+    Phase Error              (PE):    0.000ns
+\end{verbatim}
+This is why at 450MHZ clock period, the slack was negative. The clock uncertainty is 0.057ns and the slack was -0.045ns.
+
 
 
 \end{document}
+
+
+
