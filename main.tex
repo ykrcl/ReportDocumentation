@@ -636,6 +636,149 @@ There are several solutions available for negative setup slack:
 
 \textit{*In timing analysis, clock pessimism is initially introduced to ensure safety. However, when calculating timing slack (e.g., setup slack), the tools may apply Clock Pessimism Removal (CPR) to reduce or eliminate some of this conservative estimation. CPR adjusts the clock arrival times so that the analysis is more realistic. Therefore, the slack value is calculated by subtracting the arrival time from the required time. Don't get confused.}
 
+\subsection{Input Delays and Importance to Timing Report}
+When input delay is not specified in the constraints file, the tool assumes that the input signal arrives at the flip-flop at the same time as the clock edge, therefore slacks are given infinite. This can cause timing violations if the input signal arrives too close to the clock edge. Therefore, it is important to specify the input delay in the constraints file to ensure that the design meets the timing requirements. This can change:
+\begin{itemize}
+    \item Your design might have a negative hold slack because of this issue, \textbf{which is not a real issue.}
+    \item Your design meet the timing requirements, but \textbf{ with a input delay setup time might be violated in practice.}
+\end{itemize}
+Therefore, to ensure that design meets the timing requirements in the real world, you should set the input delay in the constraints file.
+To set the input delay in the constraints file, you can use the following syntax:
+\begin{verbatim}
+    set_input_delay -clock [clock_name] -max [delay_value] [port_name]
+    set_input_delay -clock [clock_name] -min [delay_value] [port_name]
+\end{verbatim}
+This is range of delay that input signal can arrive any time inside. For hold time analysis -min is used. For setup time analysis -max is used by Vivado.
+\textbf{Testing the effect of input delay to the report}
+For this purpose a simple module is created as follows:
+\begin{itemize}
+    \item Makes calculation using input and writes to a register.
+\end{itemize}
+\begin{verbatim}
+    module InputDelayTest(
+        input wire clk,
+        input wire reset,
+        input wire [7:0] data_in,
+        output reg [11:0] data_out
+    );
+        reg [7:0] prev; // Data Store
+
+        always @(posedge clk or posedge reset) begin
+            if (reset) begin
+                data_out <= 9'b00000000;  // Initialize the register
+                prev <= 8'b00000000;  // Initialize the register
+            end else begin
+                prev <= data_in;
+                data_out <= prev * 14;
+            end
+        end
+    endmodule
+\end{verbatim}
+\textbf{The design is implemented and the timing report is analyzed without constraints at first.}
+Lets take the paths going into the prev register.
+\begin{verbatim}
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -setup
+
+Timing Report
+
+Startpoint                     Endpoint                       Slack(ns)     
+----------------------------------------------------------------------------
+data_in[0]                     prev_reg[6]/D                  inf           
+data_in[0]                     prev_reg[7]/D                  inf           
+data_in[0]                     prev_reg[5]/D                  inf           
+data_in[0]                     prev_reg[4]/D                  inf           
+data_in[0]                     prev_reg[3]/D                  inf           
+data_in[0]                     prev_reg[2]/D                  inf           
+data_in[0]                     prev_reg[1]/D                  inf       
+
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -hold
+
+Timing Report
+
+Startpoint                     Endpoint                       Slack(ns)     
+----------------------------------------------------------------------------
+data_in[6]                     prev_reg[7]/D                  inf           
+data_in[4]                     prev_reg[5]/D                  inf           
+data_in[3]                     prev_reg[4]/D                  inf           
+data_in[4]                     prev_reg[6]/D                  inf           
+data_in[1]                     prev_reg[2]/D                  inf           
+data_in[2]                     prev_reg[3]/D                  inf           
+data_in[0]                     prev_reg[1]/D                  inf
+\end{verbatim}
+As you can see, the design meets the timing requirements without any constraints. Now, lets set the input delay to 5ns at maximum and 2ns at minimum and analyze the timing report again.
+\begin{verbatim}
+set_input_delay -clock [get_clocks sys_clk_pin] -max 5 [get_ports *data_in*]
+set_input_delay -clock [get_clocks sys_clk_pin] -min 2 [get_ports *data_in*]
+\end{verbatim}
+After setting the input delay, the timing report is analyzed again:
+\begin{verbatim}
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -setup
+
+Timing Report
+
+Startpoint                     Endpoint                       Slack(ns)     
+----------------------------------------------------------------------------
+data_in[0]                     prev_reg[6]/D                  3.541         
+data_in[0]                     prev_reg[5]/D                  3.573         
+data_in[0]                     prev_reg[7]/D                  3.573         
+data_in[0]                     prev_reg[4]/D                  3.634         
+data_in[0]                     prev_reg[3]/D                  3.660         
+data_in[0]                     prev_reg[2]/D                  3.713         
+data_in[0]                     prev_reg[1]/D                  3.761 
+
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -hold
+
+Timing Report
+
+Startpoint                     Endpoint                       Slack(ns)     
+----------------------------------------------------------------------------
+data_in[2]                     prev_reg[6]/D                  0.275         
+data_in[0]                     prev_reg[4]/D                  0.335         
+data_in[2]                     prev_reg[7]/D                  0.543         
+data_in[0]                     prev_reg[5]/D                  0.601         
+data_in[1]                     prev_reg[2]/D                  0.636         
+data_in[1]                     prev_reg[3]/D                  0.904         
+data_in[0]                     prev_reg[1]/D                  1.319    
+\end{verbatim}
+As you can see, the slack values are now finite and the design meets the timing requirements with the input delay constraints. Lets examine the timings one more time by changing input time values that we can assume that it will create violation:
+\begin{itemize}
+    \item As the worst setup slack is 3.541ns, if we set input delay to max 9ns, it is assumed to be violating the setup time.
+    \item As the hold slack is 0.275ns, if we set input delay to min 0ns, it is assumed to be violating the hold time.
+\end{itemize}
+\begin{verbatim}
+set_input_delay -clock [get_clocks sys_clk_pin] -max 9 [get_ports *data_in*]
+set_input_delay -clock [get_clocks sys_clk_pin] -min 0 [get_ports *data_in*]
+\end{verbatim}
+After setting the input delay, the timing report is analyzed again:
+\begin{verbatim}
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -setup
+Timing Report
+
+Startpoint                     Endpoint                       Slack(ns)     
+----------------------------------------------------------------------------
+data_in[1]                     prev_reg[6]/D                  -2.161        
+data_in[1]                     prev_reg[7]/D                  -2.066        
+data_in[1]                     prev_reg[5]/D                  -2.050        
+data_in[1]                     prev_reg[4]/D                  -1.917        
+data_in[1]                     prev_reg[3]/D                  -1.857        
+data_in[1]                     prev_reg[2]/D                  -1.504        
+data_in[0]                     prev_reg[1]/D                  -0.752
+
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -hold
+Timing Report
+
+Startpoint                     Endpoint                       Slack(ns)     
+----------------------------------------------------------------------------
+data_in[5]                     prev_reg[6]/D                  0.067         
+data_in[2]                     prev_reg[3]/D                  0.139         
+data_in[3]                     prev_reg[4]/D                  0.163         
+data_in[0]                     prev_reg[1]/D                  0.276         
+data_in[5]                     prev_reg[7]/D                  0.335         
+data_in[2]                     prev_reg[5]/D                  0.403         
+data_in[0]                     prev_reg[2]/D                  0.410
+\end{verbatim}
+As the reports indicate, the worst setup slack is droped down by almost 5.7 which is more than the input delay we increased by 4. The hold slack is also decreased by 0.2ns. This is a good example to show the importance of input delay constraints in the timing analysis.
+\textbf{Even though the slack changes exact the amount of the delay due to required and arrival time factors, our hypothesis is correct. The design is not meeting the timing requirements anymore.}
 \subsection{TCL Commands}
 The most useful settings for timing analysis when calling tcl option are:
 \begin{itemize} 
@@ -643,13 +786,17 @@ The most useful settings for timing analysis when calling tcl option are:
     \item -to [pin]: The ending point of the path to be analyzed.
     \item -setup: The setup time analysis for the paths.
     \item -hold: The hold time analysis for the paths.
-    \item -nworst [\#]: The number of worst paths per clock domain to be analyzed.
+    \item -nworst or max\_paths [\#]: The number of worst paths per clock domain if grouped or first \# paths to be analyzed.
     \item -through [names]: The paths that are crossing a specific nets/pins/cells.
+    \item -path\_type summary: This is useful only to see slack and path.
 \end{itemize}
 
 You can combine these options, adding them to options place \texttt{report\_timing [options]} to get the report you desire. 
 To find pin/path/cell names, you can use \texttt{get\_pins}, \texttt{get\_paths}, \texttt{get\_cells} commands, with search option \texttt{*keyword*}. Example: \texttt{get\_pins *clk*}.
-
+you can combine these commands like this:
+\begin{verbatim}
+    report_timing -to [get_cells *prev_reg*] -path_type summary -max_paths 20 -setup
+\end{verbatim}
 *It is useful when the original report only gives worse 10 slacks and you need to know the exact path slack for improvement. For example you can find and get timings of all paths to a single register with these commands.
 
 \chapter{Examining Reports of Common Designs \& Questions}
