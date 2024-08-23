@@ -7,9 +7,13 @@
 \usepackage{graphicx}
 
 % Define a custom environment with reduced margins
+\usepackage{changepage}
+
 \newenvironment{narrowmargins}{
-    \newgeometry{top=1in, bottom=1in, left=0.5in, right=0.5in}
-}{\restoregeometry}
+    \begin{adjustwidth}{-0.75in}{0.25in} % Adjust the left and right margins by 0.5in
+}{
+    \end{adjustwidth}
+}
 \counterwithin{figure}{subsection}
 
 \title{Implementation Report Analysis}
@@ -462,66 +466,62 @@ After the design timing summary, there is a clock timing summary. This part prov
 An example from the timing analysis report for this part is shown below:
 
 \begin{verbatim}
-    ------------------------------------------------------------------------------------------------
-    | Clock Summary
-    | -------------
-    ------------------------------------------------------------------------------------------------
-    
-    Clock        Waveform(ns)           Period(ns)      Frequency(MHz)
-    -----        ------------           ----------      --------------
-    sys_clk_pin  {0.000 5.000}          10.000          100.000         
-      rx_clk     {0.000 270.000}        540.000         1.852           
-      tx_clk     {0.000 4340.000}       8680.000        0.115           
-    
-    
-    ------------------------------------------------------------------------------------------------
-    | Intra Clock Table
-    | -----------------
-    ------------------------------------------------------------------------------------------------
-    
-    Clock             WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints
-    -----             -------      -------  ---------------------  -------------------
-    sys_clk_pin         4.227        0.000                      0                  445
-    rx_clk            535.110        0.000                      0                   74
-    tx_clk           8675.541        0.000                      0                   34
-    
-    WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)
-    -------      -------  ---------------------  -------------------     --------
-      0.058        0.000                      0                  445        4.500
-      0.177        0.000                      0                   74      269.500
-      0.191        0.000                      0                   34     4339.500
+------------------------------------------------------------------------------------------------
+| Clock Summary
+| -------------
+------------------------------------------------------------------------------------------------
+
+Clock        Waveform(ns)           Period(ns)      Frequency(MHz)
+-----        ------------           ----------      --------------
+sys_clk_pin  {0.000 5.000}          10.000          100.000         
+    rx_clk     {0.000 270.000}        540.000         1.852           
+    tx_clk     {0.000 4340.000}       8680.000        0.115           
 
     
-    
-    TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
-    --------  ----------------------  --------------------  
-       0.000                       0                   140  
-       0.000                       0                    40
-       0.000                       0                    18      
-    
-    
-       ------------------------------------------------------------------------------------------------
-    | Inter Clock Table
-    | -----------------
-    ------------------------------------------------------------------------------------------------
-    
-    From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints
-    ----------    --------          -------      -------  ---------------------
-    rx_clk        sys_clk_pin         3.864        0.000                      0
-    tx_clk        sys_clk_pin         5.181        0.000                      0
-    sys_clk_pin   tx_clk              6.771        0.000                      0
+------------------------------------------------------------------------------------------------
+| Intra Clock Table
+| -----------------
+------------------------------------------------------------------------------------------------
 
-    TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints
-    -------------------      -------      -------  ---------------------
-                     69        0.945        0.000                      0                   69 
-                      5        0.747        0.000                      0                    5
-                     25        0.131        0.000                      0                   25    
+Clock             WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints
+-----             -------      -------  ---------------------  -------------------
+sys_clk_pin         4.227        0.000                      0                  445
+rx_clk            535.110        0.000                      0                   74
+tx_clk           8675.541        0.000                      0                   34
 
-                     THS Total Endpoints
-                     -------------------    
-                                      69
-                                       5
-                                      25
+WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)
+-------      -------  ---------------------  -------------------     --------
+0.058        0.000                      0                  445        4.500
+0.177        0.000                      0                   74      269.500
+0.191        0.000                      0                   34     4339.500
+
+TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
+--------  ----------------------  --------------------  
+0.000                       0                   140  
+0.000                       0                    40
+0.000                       0                    18      
+-------------------------------------------------------------
+| Inter Clock Table                                         |
+| -----------------                                         |
+-------------------------------------------------------------
+
+From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints
+----------    --------          -------      -------  ---------------------
+rx_clk        sys_clk_pin         3.864        0.000                      0
+tx_clk        sys_clk_pin         5.181        0.000                      0
+sys_clk_pin   tx_clk              6.771        0.000                      0
+
+TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints
+-------------------      -------      -------  ---------------------
+                69        0.945        0.000                      0             
+                 5        0.747        0.000                      0                    
+                25        0.131        0.000                      0                       
+
+                    THS Total Endpoints
+                    -------------------    
+                                    69
+                                     5
+                                    25
     
 \end{verbatim}
 The first table in this part gives wave specifications of the clocks. The second table gives the slack values of the clocks. The third table gives the slack values between the clocks. If there is a negative value in the slack, you should check the detailed timing report to see which part of the design is causing the issue.
@@ -535,7 +535,7 @@ When a design slack problem is detected, the first thing to do is to check the d
 
 \subsection{Detailed Timing Report}
 For each clock domain and cross domain, for each path the timing report is placed here ordered slack worst to best. All component's delay on the path can be seen with input and clock jitter calculation available.
-An example part from the timing analysis report for this part is shown below (For single path):
+An example part from the timing analysis report for this part    is shown below (For single path):
 
 \begin{narrowmargins}
 \begin{verbatim}
@@ -617,13 +617,105 @@ There are calculation logic between these two registers. Now lets look at times:
     \item Clock signal reached the destination register at 14.857 (Destination Clock Delay: 14.857ns - 10ns = 4.857ns), starting setup time.
     \item The setup is ready at 14.571ns, with calculation of clock pessimism and uncertainty. (Slack: 14.571ns - 10.344ns = 4.227ns)
 \end{itemize}
+*Tip: When you see a border line (seperator) after a row in the path timings, a key event happend which are in the graph below. 
 
-\textbf{To sum up, time required is when the second rise of the clock signal is reaches the destination register. Time arrival is the exact time data gets to D pin. Data path delay is Q to D.}
 
-Also as you can see that the clock reacjed at different times to the two registers. This a clock skew example.*
+\textbf{To sum up, time required is when the second rise of the clock signal is reaches the destination register. Time arrival is the exact time data gets to D pin. Data path delay is Q to D.} The clock reacjed at different times to the two registers. This a clock skew example.
+
+
+\text{A graphical representation of the path as follows:}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/setup_analys.png}
+    \caption{Setup Timing Path}
+    \label{fig:setup_timing_path}
+\end{figure}
 
 When it is a hold slack timing path, the time that data reaches the destination register is calculated. Then the hold time is calculated by the time that data is stable after the clock edge.
 Unlike it is given as two flow starting at t = 0ns, one is data path, the other flow includes parts inside the register, which is to find hold time. 
+An example hold slack timing path is shown below:
+
+\begin{narrowmargins}
+\begin{verbatim}
+Min Delay Paths
+--------------------------------------------------------------------------------------
+Slack (MET) :             0.177ns  (arrival time - required time)
+Source:                 nolabel_line85/data_reg_reg[1]/C
+                        (rising edge-triggered cell FDSE clocked by rx_clk  {rise@0.000ns fall@270.000ns period=540.000ns})
+Destination:            nolabel_line85/data_out_reg[1]/D
+                        (rising edge-triggered cell FDRE clocked by rx_clk  {rise@0.000ns fall@270.000ns period=540.000ns})
+Path Group:             rx_clk
+Path Type:              Hold (Min at Fast Process Corner)
+Requirement:            0.000ns  (rx_clk rise@0.000ns - rx_clk rise@0.000ns)
+Data Path Delay:        0.266ns  (logic 0.141ns (52.911%)  route 0.125ns (47.089%))
+Logic Levels:           0  
+Clock Path Skew:        0.013ns (DCD - SCD - CPR)
+Destination Clock Delay (DCD):    3.331ns
+Source Clock Delay      (SCD):    2.476ns
+Clock Pessimism Removal (CPR):    0.842ns
+
+Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+-------------------------------------------------------------------    -------------------
+                     (clock rx_clk rise edge)     0.000     0.000 r  
+W5                                                0.000     0.000 r  clk (IN)
+                     net (fo=0)                   0.000     0.000    clk
+W5                   IBUF (Prop_ibuf_I_O)         0.226     0.226 r  clk_IBUF_inst/O
+                     net (fo=1, routed)           0.631     0.858    clk_IBUF
+BUFGCTRL_X0Y0        BUFG (Prop_bufg_I_O)         0.026     0.884 r  clk_IBUF_BUFG_inst/O
+                     net (fo=139, routed)         0.562     1.445    clk_div/clk_IBUF_BUFG
+SLICE_X35Y45         FDRE (Prop_fdre_C_Q)         0.141     1.586 r  clk_div/clk_rx_uart_out_reg/Q
+                     net (fo=2, routed)           0.268     1.854    rx_clk
+BUFGCTRL_X0Y1        BUFG (Prop_bufg_I_O)         0.026     1.880 r  rx_clk_BUFG_inst/O
+                     net (fo=39, routed)          0.596     2.476    nolabel_line85/rx_clk_BUFG
+SLICE_X3Y1           FDSE                                         r  nolabel_line85/data_reg_reg[1]/C
+-------------------------------------------------------------------    -------------------
+SLICE_X3Y1           FDSE (Prop_fdse_C_Q)         0.141     2.617 r  nolabel_line85/data_reg_reg[1]/Q
+                     net (fo=2, routed)           0.125     2.742    nolabel_line85/data_reg_reg_n_0_[1]
+SLICE_X2Y1           FDRE                                         r  nolabel_line85/data_out_reg[1]/D
+-------------------------------------------------------------------    -------------------
+
+                    (clock rx_clk rise edge)     0.000     0.000 r  
+W5                                               0.000     0.000 r  clk (IN)
+                     net (fo=0)                   0.000     0.000    clk
+W5                   IBUF (Prop_ibuf_I_O)         0.414     0.414 r  clk_IBUF_inst/O
+                     net (fo=1, routed)           0.685     1.099    clk_IBUF
+BUFGCTRL_X0Y0        BUFG (Prop_bufg_I_O)         0.029     1.128 r  clk_IBUF_BUFG_inst/O
+                     net (fo=139, routed)         0.831     1.958    clk_div/clk_IBUF_BUFG
+SLICE_X35Y45         FDRE (Prop_fdre_C_Q)         0.175     2.133 r  clk_div/clk_rx_uart_out_reg/Q
+                     net (fo=2, routed)           0.302     2.436    rx_clk
+BUFGCTRL_X0Y1        BUFG (Prop_bufg_I_O)         0.029     2.465 r  rx_clk_BUFG_inst/O
+                     net (fo=39, routed)          0.867     3.331    nolabel_line85/rx_clk_BUFG
+SLICE_X2Y1           FDRE                                         r  nolabel_line85/data_out_reg[1]/C
+                        clock pessimism             -0.842     2.489    
+SLICE_X2Y1           FDRE (Hold_fdre_C_D)         0.076     2.565    nolabel_line85/data_out_reg[1]
+-------------------------------------------------------------------
+                        required time                         -2.565    
+                        arrival time                           2.742    
+-------------------------------------------------------------------
+                        slack                                  0.177    
+\end{verbatim}    
+\end{narrowmargins}
+This report tries to calculate when destination register's data pin is changed after the clock edge for a path.
+To break down the information in the report:
+\begin{itemize}
+    \item Time axis analyzed twice, one for data path, the other for hold time.
+    \item The clock signal reached the source register at 2.476ns (Source Clock Delay), starting data path flow.
+    \item Then the signal of source register is processed by the logic between and reached the destination register at 2.742ns. (Data Path Delay: 2.742ns - (2.476ns) = 0.266ns)
+    \item The data pin is changed 2.742ns after the clock edge.
+    \item Time axis analyzed again for hold time. Starting from 0ns, the clock signal reached the destination register at 2.489ns (Destination Clock Delay), starting hold time flow (for previous data that analyzed in setup time, this report looks for future change not back).
+    \item After adding the hold time of the destination register, it is found that the data pin must not change before t=2.489ns+0.076ns(Hold Time).
+    \item But we already found that the data pin is changed at t=2.742ns. Therefore, the hold slack is calculated as 0.177ns. (Time Arrival - Time Required).
+\end{itemize}
+\textbf{To sum up, time required is when the destination register completed hold (the data before the current clock rise). Time arrival is the exact time data changes D pin. Data path delay is Q to D.}
+
+\text{A graphical representation of the path as follows:} \pagebreak
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/hold_analys.png}
+    \caption{Hold Timing Path}
+    \label{fig:hold_timing_path}
+\end{figure}
+
 
 As this path reports are categorized by clock, hold and setup, you can find the problematic sequence by inspecting the data path report like above. 
 There are several solutions available for negative setup slack:
@@ -1045,6 +1137,9 @@ The results indicates that the IP has better power utilization than the '*' oper
 Critical path timing (Violating) of the design as follows:
 
 \begin{verbatim}
+
+a_32_reg Register -> LUT 32 IP -> product_ip_64 Register
+
 Slack (VIOLATED) :        -0.973ns  (required time - arrival time)
   Source:                 a_32_reg[8]/C
                             (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
@@ -1064,6 +1159,7 @@ Slack (VIOLATED) :        -0.973ns  (required time - arrival time)
     Discrete Jitter          (DJ):    0.116ns
     Phase Error              (PE):    0.000ns
 
+b_32_reg Register -> LUT 32 '*' Logic -> product_64 Register
 
 Slack (VIOLATED) :        -0.776ns  (required time - arrival time)
   Source:                 b_32_reg[4]/C
@@ -1084,7 +1180,7 @@ Slack (VIOLATED) :        -0.776ns  (required time - arrival time)
     Discrete Jitter          (DJ):    0.116ns
     Phase Error              (PE):    0.000ns
 
-
+a_32_reg Register -> LUT 16 '*' Logic -> product_32 Register
 Slack (VIOLATED) :        -0.131ns  (required time - arrival time)
   Source:                 a_32_reg[12]/C
                             (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
@@ -1104,6 +1200,7 @@ Slack (VIOLATED) :        -0.131ns  (required time - arrival time)
     Discrete Jitter          (DJ):    0.116ns
     Phase Error              (PE):    0.000ns
 
+a_32_reg Register -> LUT 32 '*' IP -> product_ip_32 Register
 Slack (VIOLATED) :        -0.104ns  (required time - arrival time)
   Source:                 a_32_reg[0]/C
                             (rising edge-triggered cell FDRE clocked by clk_out1_clk_wiz_0  {rise@0.000ns fall@5.000ns period=10.000ns})
@@ -1126,7 +1223,7 @@ Slack (VIOLATED) :        -0.104ns  (required time - arrival time)
 \end{verbatim}
 
 The results indicate that 32-bit multiplication has timing violation for both. The '*' operator seems to more close to 0 slack than the IP multiplier for 32-Bit.
-However, for the 16-bit violation, the IP multiplier has better slack than the '*' operator. When inspected in detail all the reports, the IP multiplier has larger logic time delay than '*'. However, '*''s route delay is larger than IP multiplier. For larger bits the IP multiplier has worse slack than '*', but it has better slack for smaller bits.
+However, for the 16-bit violation, the IP multiplier has better slack than the '*' operator. Using LUT multipliers ('*' or IP) over 8-bit is not recommended because of inefficient resource utilization and timing violations.
 
 \subsection{Second Case}
 In this case, we will use the '*' operator and Multilier IP (No Stages) to multiply two numbers, using DSPs.
