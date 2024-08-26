@@ -305,6 +305,11 @@ INPUT ./images/MUL_DSP_POWER.png
 INPUT images/MUL_DSP_POWER.png
 INPUT ./images/MUL_DSP_POWER.png
 INPUT ./images/MUL_DSP_POWER.png
+INPUT ./images/delay_graph.png
+INPUT ./images/delay_graph.png
+INPUT images/delay_graph.png
+INPUT ./images/delay_graph.png
+INPUT ./images/delay_graph.png
 INPUT main.aux
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb

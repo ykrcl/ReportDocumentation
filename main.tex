@@ -1432,10 +1432,15 @@ Slack is tested again with other clocks as data path delay is changing with the 
     \hline
     \end{tabular}
     \end{table}
-
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=0.9\textwidth]{images/delay_graph.png}
+        \caption{Frequency vs Slack Graph}
+        \label{fig:slack_freq_path}
+    \end{figure}
 By looking and plotting the data we can see that the data path delay and thus the slack values are not linearly related to the clock period.
-As frequency increases, the path delay change descreases.
-By doing this analysis we can conclude that there is no linear relationship between slack and clock period, but there is a relation this close to linear at higher clock speeds.
+As frequency increases, change of the path delay descreases.
+By doing this analysis we can conclude that there is no linear relationship between slack and clock period, but there is a relation close to linear at higher clock speeds as data path delay tends to be constant.
 
 \subsection{Second Question}
 The second question requires us to find how does Multiplier IP pipelines multiple stages.
