@@ -1,0 +1,9 @@
+FFs
+BRAMs
+IOBs
+LUTs
+Vivado
+DSPs
+LUTRAM
+IOs
+LUTRAMs
