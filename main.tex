@@ -713,8 +713,20 @@ There are several solutions available for negative setup slack:
 
 \textit{*In timing analysis, clock pessimism is initially introduced to ensure safety. However, when calculating timing slack (e.g., setup slack), the tools may apply Clock Pessimism Removal (CPR) to reduce or eliminate some of this conservative estimation. CPR adjusts the clock arrival times so that the analysis is more realistic. Therefore, the slack value is calculated by subtracting the arrival time from the required time. Don't get confused.}
 
+*In order have a path in this table the clock related to the path must be registered in constraints file:
+
+For External Clocks:
+\begin{verbatim}
+    create_clock -period 2.225 -name clk_p -waveform {0.000 1.1125} [CLOCK PORT]
+\end{verbatim}
+For Internal Clocks:
+\begin{verbatim}
+    create_generated_clock -name clk -source [SOURCE CLOCK PIN/PORT] -divide_by 1 [OUTPUT PIN]
+\end{verbatim}
+
+
 \subsection{Input Delays and Importance to Timing Report}
-When input delay is not specified in the constraints file, the tool assumes that the input signal arrives at the flip-flop at the same time as the clock edge, therefore slacks are given infinite. This can cause timing violations if the input signal arrives too close to the clock edge. Therefore, it is important to specify the input delay in the constraints file to ensure that the design meets the timing requirements. This can change:
+When input delay is not specified in the constraints file, the tool assumes that the input signal arrives at a perfect time, therefore slacks are given infinite. This can cause timing violations if the input signal arrives too close to the clock edge. Therefore, it is important to specify the input delay in the constraints file to ensure that the design meets the timing requirements. This can change:
 \begin{itemize}
     \item Your design might have a negative hold slack because of this issue, \textbf{which is not a real issue.}
     \item Your design meet the timing requirements, but \textbf{ with an input delay setup time might be violated in practice.}
@@ -754,10 +766,10 @@ For this purpose a simple module is created as follows:
 \textbf{The design is implemented, and the timing report is analyzed without constraints at first.}
 Let's take the paths going into the prev register.
 \begin{verbatim}
-report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -setup
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] 
+-path_type summary -max_paths 10 -setup
 
 Timing Report
-
 Startpoint                     Endpoint                       Slack(ns)     
 ----------------------------------------------------------------------------
 data_in[0]                     prev_reg[6]/D                  inf           
@@ -768,10 +780,10 @@ data_in[0]                     prev_reg[3]/D                  inf
 data_in[0]                     prev_reg[2]/D                  inf           
 data_in[0]                     prev_reg[1]/D                  inf       
 
-report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -hold
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] 
+-path_type summary -max_paths 10 -hold
 
 Timing Report
-
 Startpoint                     Endpoint                       Slack(ns)     
 ----------------------------------------------------------------------------
 data_in[6]                     prev_reg[7]/D                  inf           
@@ -789,10 +801,10 @@ set_input_delay -clock [get_clocks sys_clk_pin] -min 2 [get_ports *data_in*]
 \end{verbatim}
 After setting the input delay, the timing report is analyzed again:
 \begin{verbatim}
-report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -setup
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] 
+-path_type summary -max_paths 10 -setup
 
 Timing Report
-
 Startpoint                     Endpoint                       Slack(ns)     
 ----------------------------------------------------------------------------
 data_in[0]                     prev_reg[6]/D                  3.541         
@@ -803,10 +815,10 @@ data_in[0]                     prev_reg[3]/D                  3.660
 data_in[0]                     prev_reg[2]/D                  3.713         
 data_in[0]                     prev_reg[1]/D                  3.761 
 
-report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] -path_type summary -max_paths 10 -hold
+report_timing -from [get_ports *data_in*] -to [get_cells *prev_reg*] 
+-path_type summary -max_paths 10 -hold
 
 Timing Report
-
 Startpoint                     Endpoint                       Slack(ns)     
 ----------------------------------------------------------------------------
 data_in[2]                     prev_reg[6]/D                  0.275         
@@ -856,7 +868,7 @@ data_in[0]                     prev_reg[2]/D                  0.410
 \end{verbatim}
 As the reports indicate, the worst setup slack is dropped down by almost 5.7 which is more than the input delay we increased by 4. The hold slack is also decreased by 0.2ns. This is a good example to show the importance of input delay constraints in the timing analysis.
 \textbf{Even though the slack changes exact the amount of the delay due to required and arrival time factors, our hypothesis is correct. The design is not meeting the timing requirements anymore.}
-\subsection{TCL Commands}
+\section{TCL Commands}
 The most useful settings for timing analysis when calling TCL option are:
 \begin{itemize} 
     \item -from [pin]: The starting point of the path to be analyzed.
@@ -1381,7 +1393,7 @@ The clock period was set to 10ns and worst slack was around -0.644ns. New clock 
 \]
 The hypothesis is that if we set the clock period to 10.667ns, the slack will be positive close to 0. The results are shown below:
 \begin{verbatim}
-    -------------------------------------------------------------------
+-------------------------------------------------------------------
     required time                          8.073    
     arrival time                          -8.073    
 -------------------------------------------------------------------
@@ -1432,7 +1444,7 @@ The second question requires us to find how does Multiplier IP pipelines multipl
 To find a relationship, we will use critical path and how it is reduced after each stage. Same module will be used with different stages of IP multipliers.
 
 During this test we will use 10ns clock period. It has initially the worst slack as -0.495ns.
-The two paths that are critical are:
+There kind of paths are critical:
 \begin{itemize}
     \item any a or b register to IP (it can have a weird name like mult\_gen\_dsp\_32/U0/i\_mult/gDSP.gDSP\_only.iDSP/ use\_prim.appDSP[1].bppDSP[1].use\_dsp.use\_dsp48e1.iDSP48E1/PCIN[0]) which refers to a flip-flop inside the DSP block)
     \item any path from IP to output register 
@@ -1441,9 +1453,9 @@ The two paths that are critical are:
 
 \begin{enumerate}
     \item \textbf{Stage 0:} Slowest path is from a\_32[i] register to the product register through the IP. \textbf{The max data path delay is 10.373 ns.}
-    \item \textbf{Stage 1:} Slowest path is from a\_32[i] register to a DSP register inside the IP. \textbf{Data path delay is 8.503.} Searching a path from an IP to output register, \textbf{the longest path is 1.119ns}, and it is in the 32-bit multiplier. It suggests that the IP doing most of the job in the first cycle.
-    \item \textbf{Stage 2:} Slowest path is from a DSP  register inside the IP to a DSP  register inside the IP (mult\_gen\_dsp\_32/U0/i\_mult/gDSP.gDSP\_only.iDSP/use\_prim.appDSP[0].bppDSP[0].use\_dsp.use\_dsp48e1.iDSP48E1/CLK to mult\_gen\_dsp\_32/U0/i\_mult/gDSP.gDSP\_only.iDSP/use\_prim.appDSP[1].bppDSP[1]). \textbf{Data path delay is 6.633}. It suggests that most of the job is done in the intermediate cycle. In the first cycle the maximum data path is to the 32-bit multiplier IP and \textbf{Its data path delay is 2.815.} The maximum data path delay from the IPs to output register is 1.180ns and in the 32-bit multiplier.
-    \item \textbf{Stage 3:} From timing report couldn't detect pipelining paths due to hidden information, but intermediate maximum data path delay is \textbf{4.208ns}. Input to the IP paths has maximum delay \textbf{2.815 ns}. The maximum data path delay from the IPs to output register is \textbf{1.119ns.} These are the maximum delay paths, and they are inside the 32-bit multiplier IP.
+    \item \textbf{Stage 1:} Slowest path is from a\_32[i] register to a DSP register inside the IP. \textbf{Data path delay is 8.503 ns.} Searching a path from an IP to output register, \textbf{the longest path is 1.119 ns}, and it is in the 32-bit multiplier. It suggests that the IP doing most of the job in the first cycle.
+    \item \textbf{Stage 2:} Slowest path is from a DSP  register inside the IP to a DSP  register inside the IP (mult\_gen\_dsp\_32/U0/i\_mult/gDSP.gDSP\_only.iDSP/use\_prim.appDSP[0].bppDSP[0].use\_dsp.use\_dsp48e1.iDSP48E1/CLK to mult\_gen\_dsp\_32/U0/i\_mult/gDSP.gDSP\_only.iDSP/use\_prim.appDSP[1].bppDSP[1]). \textbf{Data path delay is 6.633 ns}. It suggests that most of the job is done in the intermediate cycle. In the first cycle the maximum data path is to the 32-bit multiplier IP and \textbf{Its data path delay is 2.815 ns.} The maximum data path delay from the IPs to output register is 1.180 ns and in the 32-bit multiplier.
+    \item \textbf{Stage 3:} From timing report couldn't detect pipelining paths due to hidden information, but intermediate maximum data path delay is \textbf{4.208 ns}. Input to the IP paths has maximum delay \textbf{2.815 ns}. The maximum data path delay from the IPs to output register is \textbf{1.119 ns.} These are the maximum delay paths, and they are inside the 32-bit multiplier IP.
 \end{enumerate}
 
 From this information we can come up with a table:
@@ -1482,18 +1494,18 @@ To be sure that the data path delay is reduced by 2ns after each stage, the repo
 \subsection{Third Question}
 The investigation indicates that we can't assume that the stages are equally divided, and we cannot multiply clock by 2 as we increase the pipeline stages by one.
 \subsection{Fourth Question}
-Another mystery that why and how the optimum stage level of multiplier IP suggested by Vivado. The hypothesis is that it is related to the minimum clock period that the device, Basys3, can handle. Basys3 can handle maximum \textbf{450MHZ} clock frequency as documented, which corresponds to 2.222ns. The IP suggests a stage level to be 6 for 32-bit unsigned multiplier. We will check:
+Another mystery that why and how the optimum stage level of multiplier IP suggested by Vivado. The hypothesis is that it is related to the minimum clock period that the device, Basys3, can handle. Basys3 can handle maximum \textbf{463MHZ} clock frequency as documented, which corresponds to 2.159ns. The IP suggests a stage level to be 6 for 32-bit unsigned multiplier. We will check:
 \begin{itemize}
     \item The maximum delay path and the slack in the IP at stage level suggested.
-    \item If it is below 2.222ns, and we have a slack around 8ns, we will check slack given the clock period is 2.222ns because given clock related time delays data path delay doesn't directly mean time required.
+    \item If it is below 2.159ns, and we have a slack around 8ns, we will check slack given the clock period is 2.159ns because given clock related time delays data path delay doesn't directly mean time required.
     \item To finalize the hypothesis, we will check again at stage level 5 if it is failing timing.
 \end{itemize}
 
 \textbf{Checking at Stage Level 6:}
-The result showed that the worst data path delay in the whole system is 2.585ns. Minimum slack is 6.852. However, higher clock speeds can make the DSP  even faster as we already found. Therefore, it is worth to check the slack at 2.222ns clock period.
+The result showed that the worst data path delay in the whole system is 2.585ns. Minimum slack is 6.852ns. However, higher clock speeds can make the DSP  even faster as we already found. Therefore, it is worth to check the slack at 2.222ns clock period.
 
 \textbf{Checking at 2.222ns Clock Period:}
-The results indicate that the design got faster. The worst path delay is 1.802. However, due to clock effects it is slightly negative, -0.045ns. Which means that we can try to work with 400MHZ clock.
+The results indicate that the design got faster. The worst path delay is 1.802ns. However, due to clock effects it is slightly negative, -0.045ns. Which means that we can try to work with 400MHZ clock.
 
 \textbf{Checking at 2.5ns Clock Period:}
 After decreasing frequency to 400MHZ, the worst slack is:
@@ -1607,7 +1619,7 @@ module DDR4_Module(
     end
 endmodule
 \end{verbatim}
-By using the DDR module, we will try to fit multiplication of 4-bit numbers into a half clock cycle. The chosen clock period is 10ns
+By using the DDR module, we will try to fit multiplication of 4-bit numbers into a half clock cycle. The chosen clock period is 10ns.
 Parallel data paths are used to multiply the numbers in both edges of the clock. A mux with selector as clock is used to select the right data path to output. The results are shown below:
 
 
@@ -1957,7 +1969,7 @@ module SimpleCounter (
 
 endmodule
 \end{verbatim}
-The module is a simple multi cycle multiplier that counts from 1 to 4 for taking result. The counter is started by the start signal. The counter is reset by the reset signal. The counter is stopped when it reaches 10. The done signal is set to 1 when the counter is stopped. 
+The module is a simple multi cycle multiplier that counts from 1 to 4 for taking result. The counter is started by the start signal. The counter is reset by the reset signal. The counter is stopped when it reaches 4. The done signal is set to 1 when the counter is stopped. 
 We need to clarify that \texttt{done} pins changes after 3 clock cycles source changed. Therefore, \textbf{when timing analysis is done, the paths from input buffers to done can be seen as timing violated.} If there is a timing violation exists in the path, the tool can ignore it as it is a multi-cycle path. The source won't change for 3 clocks, so output register have plenty of time to stably setup.
 
 *To define a multi-cycle path, the following constraints can be used:
@@ -2025,11 +2037,13 @@ The module to run at Basys 3 board's max speed 463MHZ as below:
 \end{verbatim}
 The module is a simple adder that adds two 8-bit inputs. The clock is buffered by the IBUFDS primitive. Other than the IBUFDS next most important thing is the constraints file for the differential inputs. 
 
-You should check pinout of the specific FPGA model you have to select coupled pins, for \texttt{XC7A35T-1CPG236C} model, pinout can be found here: \texttt{https://www.physics.umd.edu/hep/drew/495/xc7a35tcpg236pkg.txt}. You can understand the coupled pins like below:
+You should check pinout of the specific FPGA model you have to select coupled pins, for \texttt{XC7A35T-1CPG236C} model, pinout can be found here: 
+
+\texttt{https://www.physics.umd.edu/hep/drew/495/xc7a35tcpg236pkg.txt}. You can understand the coupled pins like below:
 \begin{verbatim}
-Pin  Pin Name                      Memory Byte Group  Bank  VCCAUX Group  Super Logic Region  I/O Type  No-Connect
-U3   IO_L9P_T1_DQS_34              1                  34    NA            NA                  HR        NA
-U2   IO_L9N_T1_DQS_34              1                  34    NA            NA                  HR        NA
+Pin  Pin Name                      Memory Byte Group  Bank  VCCAUX Group  I/O Type  No-Connect
+U3   IO_L9P_T1_DQS_34              1                  34    NA            HR        NA
+U2   IO_L9N_T1_DQS_34              1                  34    NA            HR        NA
 \end{verbatim}
 Look at Pin Name column the names will be identical except P and N suffixes after IO\_[PINNUMBER].
 In the constraints file, a master clock for p signal and generated clock for the output of IBUFDS should be defined. The constraints file is below:
